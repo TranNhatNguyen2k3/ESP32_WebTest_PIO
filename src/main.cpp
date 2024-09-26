@@ -1,12 +1,12 @@
 #include <WiFi.h>
 #include <SPIFFS.h>
 #include <WebServer.h>
+#include <Arduino.h>
 
- 
 const char* ssid = "HUUPHAP";
 const char* password = "2024@018";
 const int ledPin = 2;
- 
+
 WebServer server(80);
 
 String getContentType(String filename) {
@@ -21,14 +21,13 @@ String getContentType(String filename) {
 
 void setup() {
   Serial.begin(115200);
+  pinMode(ledPin, OUTPUT);
 
-  
   if (!SPIFFS.begin(true)) {
     Serial.println("SPIFFS Mount Failed");
     return;
   }
 
-   
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
@@ -38,14 +37,14 @@ void setup() {
   Serial.println("WiFi connected");
   Serial.println(WiFi.localIP());
 
- 
+  
   server.on("/", HTTP_GET, []() {
     File file = SPIFFS.open("/index.html", "r");
     if (!file) {
       server.send(404, "text/plain", "File not found");
       return;
     }
-    server.streamFile(file, "text/html");
+  server.streamFile(file, "text/html");
     file.close();
   });
   server.on("/led/on", HTTP_GET, []() {
@@ -58,14 +57,20 @@ void setup() {
     server.send(200, "text/plain", "LED is OFF");
   });
 
-   
+  
   server.onNotFound([]() {
     String path = server.uri();
+    Serial.print("Client requested: ");
+    Serial.println(path);
+    
+    if (path.endsWith("/")) path += "index.html";   
+
     if (SPIFFS.exists(path)) {
       File file = SPIFFS.open(path, "r");
       server.streamFile(file, getContentType(path));
       file.close();
     } else {
+      Serial.println("File not found");
       server.send(404, "text/plain", "File not found");
     }
   });
@@ -74,7 +79,6 @@ void setup() {
   Serial.println("HTTP server started");
 }
 
- 
 void loop() {
   server.handleClient();
 }
